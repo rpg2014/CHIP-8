@@ -2,6 +2,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Bytes;
+use std::collections::HashSet;
+use crate::keyboard::Keyboard;
 
 
 
@@ -14,7 +16,7 @@ pub struct Chip_8 {
     delay_timer: u8,
     sound_timer: u8,
     stack: Vec<u16>,
-    //keyboard: Keys,
+    keyboard: Keyboard,
     
 }
 
@@ -47,6 +49,7 @@ impl Chip_8 {
             stack: Vec::with_capacity(16),
             delay_timer: 0,
             sound_timer: 0,
+            keyboard: Keyboard::init(),
         };
 
         Ok(chip8)
@@ -65,6 +68,10 @@ impl Chip_8 {
 
     pub fn get_graphics_buffer(&self) -> [u8; 64*32] {
         return self.graphics_buffer;
+    }
+
+    pub fn set_keys(&mut self, keys: HashSet<char>){
+        self.keyboard.set_state(keys);
     }
 
     fn get_font_array() -> Result<Vec<u8>, Box<dyn Error>> {
