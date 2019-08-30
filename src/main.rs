@@ -1,4 +1,5 @@
 extern crate crossterm;
+extern crate string_error;
 
 use std::error::Error;
 use chip::Chip_8;

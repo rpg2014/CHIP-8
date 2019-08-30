@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::io::Bytes;
 use std::collections::HashSet;
 use crate::keyboard::Keyboard;
+use string_error::static_err;
 
 
 
@@ -24,11 +25,12 @@ pub struct Chip_8 {
 
 impl Chip_8 {
     
-    pub fn run_cycle(&self) -> Result<(), Box<dyn Error>> {
+    pub fn run_cycle(&mut self) -> Result<(), Box<dyn Error>> {
         let op_code: u16 = (self.memory[self.program_counter as usize] as u16) << 8 | (self.memory[self.program_counter as usize + 1] as u16);
-
+        self.execute_instruction(op_code)?;
         //decode opcode
         //execute opcode
+        self.update_timers()?;
         Ok(())
 
 
@@ -94,4 +96,98 @@ impl Chip_8 {
   0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 ]);
     }
+    fn update_timers(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        };
+        if self.sound_timer > 0 {
+            if self.sound_timer == 1 {
+                doBeep();
+                self.sound_timer -= 1;
+            }
+        };
+        Ok(())
+    }
+
+    
+
+
+    fn execute_instruction(&mut self, op_code: u16) -> Result<(), Box<dyn Error>>{
+        match op_code & 0xF000 {
+            0x0000 => {
+                match op_code & 0x000F {
+                    0x0000 => {
+                        // trust me the 0x0000 catching the 0x00E0 makes sense.  
+                        // 0x00E0 Clears the screen
+                        self.graphics_buffer = [0; 64*32];
+                        self.program_counter += 2;
+                    }
+                    0x000E => {
+                        // Returns from subroutine
+                        self.program_counter = self.stack.pop().unwrap();
+                    }
+                    _ => println!("Unknown opcode [ 0x0000 block]: {}", op_code)
+                }
+            }
+            0x1000 => {
+                self.program_counter = op_code & 0x0FFF
+            }
+            0x2000 => { // calls subroutine at 0x0NNN
+                self.stack.push(self.program_counter);
+                self.program_counter = op_code & 0x0FFF;
+            }
+            0x3000 => { // 0x3xkk skip next instruction if Vx == kk
+                if self.registers[(op_code & 0x0F00) as usize] == (op_code & 0x00FF) as u8 {
+                    self.program_counter += 2;
+                }
+                self.program_counter +=2;
+            }
+            0x4000 => { // 0x4xkk skip next instruction if Vx != kk
+                if self.registers[(op_code & 0x0F00) as usize] != (op_code & 0x0FF) as u8 {
+                    self.program_counter +=2;
+                }
+                self.program_counter += 2;
+            }
+            0x8000 => { // contains a 1 - 7 + E  codes that do register math.  
+                match op_code & 0x000F {
+                    0x0004 => { // 0x8XY4  adds Value of VY to VX, VF is set to 1 if ther is a carry, 0 if not
+                        if self.registers[((op_code & 0x00f0) >> 4) as usize] > (0xFF - self.registers[((op_code & 0xF000)) as usize]) {
+                            self.registers[0xF] = 1;
+                        }else {
+                            self.registers[0xF] = 0;
+                        }
+                        self.registers[((op_code & 0x0F00) >> 8 )as usize] += self.registers[(op_code & 0x00F0) as usize];
+                        self.program_counter += 2;
+                    }
+                    _ => println!("Unknown opcode [0x8XYN]: {}",op_code)
+                }
+            }
+            
+            0xA000 => {
+                    self.index_register = op_code & 0x0FFF;
+                    self.program_counter += 2;
+                
+                }
+            _ => println!("Not Implemented or not supported opcode")
+        }
+        Ok(())
+    }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn execute_instruction_should_catchOpCode() {
+        println!("{}",0xF);
+        
+    }
+
+}
+
+fn doBeep() {
+        
+    }
